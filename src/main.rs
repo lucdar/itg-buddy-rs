@@ -10,12 +10,12 @@ async fn ping(
     ctx: Context<'_>,
     #[description = "Message to respond with"] msg: Option<String>,
 ) -> Result<(), Error> {
-    let response = format!("Pong! {}", msg.unwrap_or(String::from("")));
+    let response = format!("Pong! {}", msg.unwrap_or("".into()));
     ctx.reply(response).await?;
     Ok(())
 }
 
-// Spawn poise boxes to register slash commands
+// Spawn poise boxes to register or deregister slash commands
 #[poise::command(prefix_command, slash_command, owners_only)]
 async fn register(ctx: Context<'_>) -> Result<(), Error> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
@@ -24,13 +24,19 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let intents = serenity::GatewayIntents::non_privileged();
+    let intents = serenity::GatewayIntents::union(
+        serenity::GatewayIntents::non_privileged(),
+        serenity::GatewayIntents::MESSAGE_CONTENT,
+    );
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![ping(), register()],
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: Some("!".into()),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
