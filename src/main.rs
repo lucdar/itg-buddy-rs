@@ -1,3 +1,4 @@
+use config::ITGBuddyConfig;
 use poise::serenity_prelude as serenity;
 
 struct Data {} // User data, which is stored and accessible in all command invocations
@@ -24,6 +25,13 @@ async fn register(ctx: Context<'_>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() {
+    if std::env::args().nth(1) == Some("setup".into()) {
+        let config = ITGBuddyConfig::new();
+        let config_str = toml::to_string(&config).unwrap();
+        println!("{}", config_str);
+        std::process::exit(0);
+    };
+
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
     let intents = serenity::GatewayIntents::union(
         serenity::GatewayIntents::non_privileged(),
@@ -39,16 +47,45 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {})
-            })
-        })
+        .setup(|_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
         .build();
 
     let client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .await;
     client.unwrap().start().await.unwrap()
+}
+
+mod config {
+    use colored::Colorize;
+    use serde::{Deserialize, Serialize};
+    use std::io::{self, Write};
+    #[derive(Serialize, Deserialize, Default)]
+    pub struct ITGBuddyConfig {
+        discord_key: String,
+        itg_cli_dir: String,
+    }
+    impl ITGBuddyConfig {
+        pub fn new() -> ITGBuddyConfig {
+            let mut config = ITGBuddyConfig::default();
+            print!("Input your {}: ", "discord key".yellow().bold());
+            io::stdout().flush().expect("Failed to flush stdout");
+            io::stdin()
+                .read_line(&mut config.discord_key)
+                .expect("Failed to read line");
+            trim_newline(&mut config.discord_key);
+            print!("Input your {}: ", "itg-cli install path".yellow().bold());
+            io::stdout().flush().expect("Failed to flush stdout");
+            io::stdin()
+                .read_line(&mut config.itg_cli_dir)
+                .expect("Failed to read line");
+            trim_newline(&mut config.itg_cli_dir);
+            config
+        }
+    }
+    fn trim_newline(s: &mut String) {
+        while s.ends_with('\n') || s.ends_with('\r') {
+            s.pop();
+        }
+    }
 }
