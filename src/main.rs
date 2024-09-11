@@ -26,11 +26,13 @@ async fn register(ctx: Context<'_>) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     if std::env::args().nth(1) == Some("setup".into()) {
-        let config = ITGBuddyConfig::new()?;
+        ITGBuddyConfig::new()?.store()?;
         std::process::exit(0);
     };
 
-    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
+    let cfg = config::load()?;
+    let token = cfg.discord_key;
+
     let intents = serenity::GatewayIntents::union(
         serenity::GatewayIntents::non_privileged(),
         serenity::GatewayIntents::MESSAGE_CONTENT,
@@ -59,10 +61,14 @@ mod config {
     use colored::Colorize;
     use serde::{Deserialize, Serialize};
     use std::io::{self, Write};
+
+    const APPNAME: &str = "itg-buddy";
+    const CONFIGNAME: &str = "config";
+
     #[derive(Serialize, Deserialize, Default)]
     pub struct ITGBuddyConfig {
-        discord_key: String,
-        itg_cli_dir: String,
+        pub discord_key: String,
+        pub itg_cli_dir: String,
     }
     impl ITGBuddyConfig {
         pub fn new() -> Result<ITGBuddyConfig> {
@@ -84,6 +90,12 @@ mod config {
 
             Ok(config)
         }
+        pub fn store(&self) -> Result<()> {
+            Ok(confy::store(APPNAME, CONFIGNAME, self).context("Failed to store config")?)
+        }
+    }
+    pub fn load() -> Result<ITGBuddyConfig> {
+        Ok(confy::load(APPNAME, CONFIGNAME)?)
     }
     fn trim_newline(s: &mut String) {
         while s.ends_with('\n') || s.ends_with('\r') {
