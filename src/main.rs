@@ -8,12 +8,12 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 struct Data {} // User data, which is stored and accessible in all command invocations
 
 struct AddSongHandler {
-    watched_channel: String,
+    watched_channel_id: String,
 }
 #[async_trait]
 impl serenity::EventHandler for AddSongHandler {
     async fn message(&self, ctx: serenity::Context, msg: serenity::Message) {
-        if msg.channel_id.to_string() != self.watched_channel || msg.attachments.is_empty() {
+        if msg.channel_id.to_string() != self.watched_channel_id || msg.attachments.is_empty() {
             return;
         }
         for zip in msg
@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
     let client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .event_handler(AddSongHandler {
-            watched_channel: cfg.add_song_channel,
+            watched_channel_id: cfg.add_song_channel_id,
         })
         .await;
     Ok(client.unwrap().start().await?)
@@ -104,7 +104,7 @@ mod config {
     #[derive(Serialize, Deserialize, Default)]
     pub struct ITGBuddyConfig {
         pub discord_key: String,
-        pub add_song_channel: String,
+        pub add_song_channel_id: String,
     }
     impl ITGBuddyConfig {
         pub fn new() -> Result<ITGBuddyConfig> {
@@ -120,14 +120,18 @@ mod config {
             print!("Input your {}: ", "add-song channel ID".yellow().bold());
             io::stdout().flush().context("Failed to flush stdout")?;
             io::stdin()
-                .read_line(&mut config.add_song_channel)
+                .read_line(&mut config.add_song_channel_id)
                 .context("Failed to read line")?;
-            trim_newline(&mut config.add_song_channel);
+            trim_newline(&mut config.add_song_channel_id);
 
             Ok(config)
         }
         pub fn store(&self) -> Result<()> {
-            confy::store(APPNAME, CONFIGNAME, self).context("Failed to store config")
+            confy::store(APPNAME, CONFIGNAME, self).context("Failed to store config")?;
+            confy::get_configuration_file_path(APPNAME, CONFIGNAME)?
+                .to_str()
+                .inspect(|s| println!("Saved config to {}", s.underline().bold()));
+            Ok(())
         }
     }
     pub fn load() -> Result<ITGBuddyConfig> {
