@@ -101,6 +101,17 @@ mod config {
     const APPNAME: &str = "itg-buddy";
     const CONFIGNAME: &str = "config";
 
+    macro_rules! prompt_field {
+        ($config:ident.$field:ident) => {
+            print!("Input your {}: ", stringify!($field).yellow().bold());
+            io::stdout().flush().context("Failed to flush stdout")?;
+            io::stdin()
+                .read_line(&mut $config.$field)
+                .context("Failed to read line")?;
+            trim_newline(&mut $config.$field);
+        };
+    }
+
     #[derive(Serialize, Deserialize, Default)]
     pub struct ITGBuddyConfig {
         pub discord_key: String,
@@ -109,21 +120,8 @@ mod config {
     impl ITGBuddyConfig {
         pub fn new() -> Result<ITGBuddyConfig> {
             let mut config = ITGBuddyConfig::default();
-            // discord_key
-            print!("Input your {}: ", "discord key".yellow().bold());
-            io::stdout().flush().context("Failed to flush stdout")?;
-            io::stdin()
-                .read_line(&mut config.discord_key)
-                .context("Failed to read line")?;
-            trim_newline(&mut config.discord_key);
-            // add_song_channel
-            print!("Input your {}: ", "add-song channel ID".yellow().bold());
-            io::stdout().flush().context("Failed to flush stdout")?;
-            io::stdin()
-                .read_line(&mut config.add_song_channel_id)
-                .context("Failed to read line")?;
-            trim_newline(&mut config.add_song_channel_id);
-
+            prompt_field!(config.discord_key);
+            prompt_field!(config.add_song_channel_id);
             Ok(config)
         }
         pub fn store(&self) -> Result<()> {
