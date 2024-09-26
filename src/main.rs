@@ -1,9 +1,42 @@
 use anyhow::{Error, Result};
 use config::ITGBuddyConfig;
+use indoc::formatdoc;
 use poise::serenity_prelude as serenity;
+use serenity::async_trait;
 
 type Context<'a> = poise::Context<'a, Data, Error>;
 struct Data {} // User data, which is stored and accessible in all command invocations
+
+struct AddSongHandler {
+    watched_channel: String,
+}
+#[async_trait]
+impl serenity::EventHandler for AddSongHandler {
+    async fn message(&self, ctx: serenity::Context, msg: serenity::Message) {
+        if msg.channel_id.to_string() != self.watched_channel || msg.attachments.is_empty() {
+            return;
+        }
+        for zip in msg
+            .attachments
+            .iter()
+            .filter(|x| x.filename.ends_with(".zip"))
+        {
+            let response = formatdoc! {"
+                ## Calling `add-song`
+                **url**: {url}
+                **singles**: 
+                **cache**:", 
+                url=zip.url
+            };
+            println!("Calling add-song: {}", zip.filename);
+            let _ = msg
+                .reply(&ctx.http, response)
+                .await
+                .inspect_err(|e| eprintln!("failed to send message {e}"));
+            // TODO: Call itg_cli add_song function
+        }
+    }
+}
 
 // Replys to the command, optionally with a supplied message
 #[poise::command(slash_command, prefix_command)]
@@ -52,6 +85,9 @@ async fn main() -> Result<()> {
 
     let client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
+        .event_handler(AddSongHandler {
+            watched_channel: cfg.add_song_channel,
+        })
         .await;
     Ok(client.unwrap().start().await?)
 }
@@ -68,7 +104,7 @@ mod config {
     #[derive(Serialize, Deserialize, Default)]
     pub struct ITGBuddyConfig {
         pub discord_key: String,
-        pub itg_cli_dir: String,
+        pub add_song_channel: String,
     }
     impl ITGBuddyConfig {
         pub fn new() -> Result<ITGBuddyConfig> {
@@ -80,22 +116,22 @@ mod config {
                 .read_line(&mut config.discord_key)
                 .context("Failed to read line")?;
             trim_newline(&mut config.discord_key);
-            // itg_cli_dir
-            print!("Input your {}: ", "itg-cli install path".yellow().bold());
+            // add_song_channel
+            print!("Input your {}: ", "add-song channel ID".yellow().bold());
             io::stdout().flush().context("Failed to flush stdout")?;
             io::stdin()
-                .read_line(&mut config.itg_cli_dir)
+                .read_line(&mut config.add_song_channel)
                 .context("Failed to read line")?;
-            trim_newline(&mut config.itg_cli_dir);
+            trim_newline(&mut config.add_song_channel);
 
             Ok(config)
         }
         pub fn store(&self) -> Result<()> {
-            Ok(confy::store(APPNAME, CONFIGNAME, self).context("Failed to store config")?)
+            confy::store(APPNAME, CONFIGNAME, self).context("Failed to store config")
         }
     }
     pub fn load() -> Result<ITGBuddyConfig> {
-        Ok(confy::load(APPNAME, CONFIGNAME)?)
+        confy::load(APPNAME, CONFIGNAME).context("Failed to load config file")
     }
     fn trim_newline(s: &mut String) {
         while s.ends_with('\n') || s.ends_with('\r') {
