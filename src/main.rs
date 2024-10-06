@@ -103,12 +103,17 @@ mod config {
 
     macro_rules! prompt_field {
         ($config:ident.$field:ident) => {
-            print!("Input your {}: ", stringify!($field).yellow().bold());
+            let mut buf: String = "".into();
+            print!(
+                "Input your {}: ",
+                stringify!($field).replace("_", " ").yellow().bold()
+            );
             io::stdout().flush().context("Failed to flush stdout")?;
             io::stdin()
-                .read_line(&mut $config.$field)
+                .read_line(&mut buf)
                 .context("Failed to read line")?;
-            trim_newline(&mut $config.$field);
+            trim_newline(&mut buf);
+            $config.$field = buf.into();
         };
     }
 
@@ -121,7 +126,6 @@ mod config {
         pub fn new() -> Result<ITGBuddyConfig> {
             let mut config = ITGBuddyConfig::default();
             prompt_field!(config.discord_key);
-            prompt_field!(config.add_song_channel_id);
             Ok(config)
         }
         pub fn store(&self) -> Result<()> {
