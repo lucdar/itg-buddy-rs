@@ -31,6 +31,7 @@ impl ITGBuddyConfig {
     pub fn new() -> Result<ITGBuddyConfig> {
         let mut config = ITGBuddyConfig::default();
         prompt_field!(config.discord_key);
+        prompt_field!(config.add_song_channel_id);
         Ok(config)
     }
     pub fn store(&self) -> Result<()> {
