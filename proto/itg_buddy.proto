@@ -1,0 +1,16 @@
+syntax = "proto3";
+package itg_buddy;
+
+service SimfileManagement {
+  rpc AddSong (AddSongRequest) returns (AddSongResponse);
+}
+
+message AddSongRequest {
+  string path_or_url = 1;
+  bool   overwrite = 2;
+}
+
+message AddSongResponse {
+  string added_song = 2;
+  string destination = 3;
+}

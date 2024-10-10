@@ -3,12 +3,21 @@ name = "itg-buddy-rs"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "itg-buddy"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.87"
 colored = "2.1.0"
 confy = "0.6.1"
 indoc = "2.0.5"
 poise = "0.6.1"
+prost = "0.13.3"
 serde = "1.0.210"
 serenity = "0.12"
 tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
+tonic = "0.12.3"
+
+[build-dependencies]
+tonic-build = "0.12.3"

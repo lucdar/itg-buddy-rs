@@ -1,10 +1,11 @@
 use anyhow::{Error, Result};
 use config::ITGBuddyConfig;
-use indoc::formatdoc;
 use poise::serenity_prelude as serenity;
 use serenity::async_trait;
 
 mod config;
+mod itg_endpoint;
+use itg_endpoint::ItgEndpoint;
 
 type Context<'a> = poise::Context<'a, Data, Error>;
 struct Data {} // User data, which is stored and accessible in all command invocations
@@ -15,7 +16,9 @@ struct AddSongHandler {
 #[async_trait]
 impl serenity::EventHandler for AddSongHandler {
     async fn message(&self, ctx: serenity::Context, msg: serenity::Message) {
-        if msg.channel_id.to_string() != self.watched_channel_id || msg.attachments.is_empty() {
+        let wrong_channel = msg.channel_id.to_string() != self.watched_channel_id;
+        let no_attachments = msg.attachments.is_empty();
+        if wrong_channel || no_attachments {
             return;
         }
         for zip in msg
@@ -23,21 +26,43 @@ impl serenity::EventHandler for AddSongHandler {
             .iter()
             .filter(|x| x.filename.ends_with(".zip"))
         {
-            let response = formatdoc! {"
-                ## Calling `add-song`
-                **url**: {url}
-                **singles**: 
-                **cache**:", 
-                url=zip.url
+            let endpoint = match ItgEndpoint::new("http://localhost:50051").await {
+                Ok(endpoint) => endpoint,
+                Err(e) => {
+                    println!("Error connecting to itg endpoint: {e}");
+                    let e_str = format!("Couldn't connect to itg endpoint: ```{e}```");
+                    let _ = msg.reply(&ctx.http, e_str).await;
+                    return;
+                }
             };
-            println!("Calling add-song: {}", zip.filename);
-            let _ = msg
-                .reply(&ctx.http, response)
-                .await
-                .inspect_err(|e| eprintln!("failed to send message {e}"));
-            // TODO: Call itg_cli add_song function
+            match endpoint.add_song(&zip.url, true).await {
+                Ok(result) => {
+                    let succ_msg =
+                        format!("Added {} to {}.", result.added_song, result.destination);
+                    let _ = msg.reply(&ctx.http, succ_msg).await;
+                }
+                Err(e) => {
+                    println!("Error adding song: {e}");
+                    let _ = msg.reply(&ctx.http, "Error adding song.").await;
+                }
+            }
         }
     }
+}
+
+// Calls `itg-cli add-song` on the supplied URL
+#[poise::command(slash_command, prefix_command)]
+async fn add_song(
+    ctx: Context<'_>,
+    #[description = "Link to song to add"] url: String,
+) -> Result<()> {
+    let result = ItgEndpoint::new("http://localhost:50051")
+        .await?
+        .add_song(&url, true)
+        .await?;
+    let s = format!("Added {} to {}.", result.added_song, result.destination);
+    ctx.reply(s).await?;
+    Ok(())
 }
 
 // Replys to the command, optionally with a supplied message
